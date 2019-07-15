@@ -9,40 +9,87 @@ import (
 
 // FileMetaInfo holds information about one file (which may not exist).
 type FileMetaInfo struct {
-	Path    string
-	Exists  bool
-	ModTime time.Time
-	Err     error
+	path string
+	err  error
+	fi   os.FileInfo
 }
+
+func (file FileMetaInfo) Exists() bool {
+	return file.fi != nil && file.err == nil
+}
+
+func (file FileMetaInfo) Path() string {
+	return file.path
+}
+
+func (file FileMetaInfo) Name() string {
+	if file.fi == nil {
+		return ""
+	}
+	return file.fi.Name()
+}
+
+func (file FileMetaInfo) Size() int64 {
+	if file.fi == nil {
+		return 0
+	}
+	return file.fi.Size()
+}
+
+func (file FileMetaInfo) Mode() os.FileMode {
+	if file.fi == nil {
+		return 0
+	}
+	return file.fi.Mode()
+}
+
+func (file FileMetaInfo) ModTime() time.Time {
+	if file.fi == nil {
+		return time.Time{}
+	}
+	return file.fi.ModTime()
+}
+
+func (file FileMetaInfo) IsDir() bool {
+	if file.fi == nil {
+		return false
+	}
+	return file.fi.IsDir()
+}
+
+func (file FileMetaInfo) Sys() interface{} {
+	if file.fi == nil {
+		return nil
+	}
+	return file.fi.Sys()
+}
+
+func (file FileMetaInfo) Err() error {
+	return file.err
+}
+
+//-------------------------------------------------------------------------------------------------
 
 // Files holdsdata on a group of files.
 type Files []FileMetaInfo
 
-// New builds file information for one or more files.
-func New(includeEmpties bool, paths ...string) Files {
+// New builds file information for one or more files. If filesystem errors
+// arise, these are held in the files returned and can be inspected later.
+func New(paths ...string) Files {
 	result := make(Files, len(paths))
 
-	i := 0
-	for _, p := range paths {
-		fm := singleFileMeta(p)
-		if fm.Exists {
-			result[i] = fm
-			i += 1
-		} else {
-			if includeEmpties {
-				result[i] = fm
-				i += 1
-			}
-		}
+	for i, p := range paths {
+		fm := Stat(p)
+		result[i] = fm
 	}
 
-	return result[:i]
+	return result
 }
 
-func singleFileMeta(path string) FileMetaInfo {
+func Stat(path string) FileMetaInfo {
 	Debug("stat %q\n", path)
 	if path == "" {
-		return FileMetaInfo{Path: path, Exists: false}
+		return FileMetaInfo{path: path}
 	}
 
 	info, err := fs.Stat(path)
@@ -50,24 +97,27 @@ func singleFileMeta(path string) FileMetaInfo {
 	if err != nil {
 		if os.IsNotExist(err) {
 			Debug("%q does not exist.\n", path)
-			return FileMetaInfo{Path: path, Exists: false}
+			return FileMetaInfo{path: path}
 		} else {
-			return FileMetaInfo{Path: path, Err: err}
+			return FileMetaInfo{path: path, err: err}
 		}
 	}
 
-	return FileMetaInfo{Path: path, Exists: true, ModTime: info.ModTime()}
+	return FileMetaInfo{
+		path: path,
+		fi:   info,
+	}
 }
 
 func (file FileMetaInfo) Younger(other FileMetaInfo) FileMetaInfo {
-	if other.ModTime.After(file.ModTime) {
+	if other.ModTime().After(file.ModTime()) {
 		return other
 	}
 	return file
 }
 
 func (file FileMetaInfo) Older(other FileMetaInfo) FileMetaInfo {
-	if other.ModTime.Before(file.ModTime) {
+	if other.ModTime().Before(file.ModTime()) {
 		return other
 	}
 	return file
@@ -95,15 +145,47 @@ func (files Files) Compare(other Files) Comparison {
 	files.Sorted()
 	other.Sorted()
 
-	if files[len(files)-1].ModTime.Before(other[0].ModTime) {
+	if files[len(files)-1].ModTime().Before(other[0].ModTime()) {
 		return AllAreOlder
 	}
 
-	if other[len(other)-1].ModTime.Before(files[0].ModTime) {
+	if other[len(other)-1].ModTime().Before(files[0].ModTime()) {
 		return AllAreYounger
 	}
 
 	return Overlapping
+}
+
+//-------------------------------------------------------------------------------------------------
+
+// Partition separates files that exist from those that don't.
+func (files Files) Partition() (allFiles, allDirs, absent Files) {
+	nf, nd, na := 0, 0, 0
+	for _, f := range files {
+		if f.Exists() && f.IsDir() {
+			nd++
+		} else if f.Exists() {
+			nf++
+		} else {
+			na++
+		}
+	}
+
+	allFiles = make(Files, 0, nf)
+	allDirs = make(Files, 0, nd)
+	absent = make(Files, 0, na)
+
+	for _, f := range files {
+		if f.Exists() && f.IsDir() {
+			allDirs = append(allDirs, f)
+		} else if f.Exists() {
+			allFiles = append(allFiles, f)
+		} else {
+			absent = append(absent, f)
+		}
+	}
+
+	return allFiles, allDirs, absent
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -124,7 +206,7 @@ func (files byModTime) Swap(i, j int) {
 }
 
 func (files byModTime) Less(i, j int) bool {
-	return files[i].ModTime.Before(files[j].ModTime)
+	return files[i].ModTime().Before(files[j].ModTime())
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -133,8 +215,8 @@ func (files byModTime) Less(i, j int) bool {
 func (files Files) Errors() Errors {
 	ee := make(Errors, 0, len(files))
 	for _, f := range files {
-		if f.Err != nil {
-			ee = append(ee, f.Err)
+		if f.err != nil {
+			ee = append(ee, f.err)
 		}
 	}
 	return ee
