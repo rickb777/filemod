@@ -99,6 +99,7 @@ func Stat(path string) FileMetaInfo {
 			Debug("%q does not exist.\n", path)
 			return FileMetaInfo{path: path}
 		} else {
+			Debug("%q stat error %v.\n", path, err)
 			return FileMetaInfo{path: path, err: err}
 		}
 	}
