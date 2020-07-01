@@ -2,8 +2,6 @@ package filemod
 
 import (
 	"os"
-	"sort"
-	"strings"
 	"time"
 )
 
@@ -70,22 +68,6 @@ func (file FileMetaInfo) Err() error {
 
 //-------------------------------------------------------------------------------------------------
 
-// Files holdsdata on a group of files.
-type Files []FileMetaInfo
-
-// New builds file information for one or more files. If filesystem errors
-// arise, these are held in the files returned and can be inspected later.
-func New(paths ...string) Files {
-	result := make(Files, len(paths))
-
-	for i, p := range paths {
-		fm := Stat(p)
-		result[i] = fm
-	}
-
-	return result
-}
-
 func Stat(path string) FileMetaInfo {
 	Debug("stat %q\n", path)
 	if path == "" {
@@ -110,134 +92,26 @@ func Stat(path string) FileMetaInfo {
 	}
 }
 
-func (file FileMetaInfo) Younger(other FileMetaInfo) FileMetaInfo {
-	if other.ModTime().After(file.ModTime()) {
-		return other
+func (file FileMetaInfo) Newer(other FileMetaInfo) FileMetaInfo {
+	if file.NewerThan(other) {
+		return file
 	}
-	return file
+	return other
 }
 
 func (file FileMetaInfo) Older(other FileMetaInfo) FileMetaInfo {
-	if other.ModTime().Before(file.ModTime()) {
-		return other
+	if file.OlderThan(other) {
+		return file
 	}
-	return file
+	return other
 }
 
-//-------------------------------------------------------------------------------------------------
-
-// Comparison enumerates how two sets of files compare.
-type Comparison int
-
-const (
-	Undefined Comparison = iota
-	AllAreYounger
-	Overlapping
-	AllAreOlder
-)
-
-// Compare sorts the files and another set of files, then compares the youngest
-// and oldest in each set.
-func (files Files) Compare(other Files) Comparison {
-	if len(files) == 0 || len(other) == 0 {
-		return Undefined
-	}
-
-	files.Sorted()
-	other.Sorted()
-
-	if files[len(files)-1].ModTime().Before(other[0].ModTime()) {
-		return AllAreOlder
-	}
-
-	if other[len(other)-1].ModTime().Before(files[0].ModTime()) {
-		return AllAreYounger
-	}
-
-	return Overlapping
+func (file FileMetaInfo) NewerThan(other FileMetaInfo) bool {
+	return file.ModTime().After(other.ModTime())
 }
 
-//-------------------------------------------------------------------------------------------------
-
-// Partition separates files that exist from those that don't.
-func (files Files) Partition() (allFiles, allDirs, absent Files) {
-	nf, nd, na := 0, 0, 0
-	for _, f := range files {
-		if f.Exists() && f.IsDir() {
-			nd++
-		} else if f.Exists() {
-			nf++
-		} else {
-			na++
-		}
-	}
-
-	allFiles = make(Files, 0, nf)
-	allDirs = make(Files, 0, nd)
-	absent = make(Files, 0, na)
-
-	for _, f := range files {
-		if f.Exists() && f.IsDir() {
-			allDirs = append(allDirs, f)
-		} else if f.Exists() {
-			allFiles = append(allFiles, f)
-		} else {
-			absent = append(absent, f)
-		}
-	}
-
-	return allFiles, allDirs, absent
-}
-
-//-------------------------------------------------------------------------------------------------
-
-// Sorted rearranges the files into modification-time order with the oldest first.
-func (files Files) Sorted() {
-	sort.Stable(byModTime(files))
-}
-
-type byModTime Files
-
-func (files byModTime) Len() int {
-	return len(files)
-}
-
-func (files byModTime) Swap(i, j int) {
-	files[i], files[j] = files[j], files[i]
-}
-
-func (files byModTime) Less(i, j int) bool {
-	return files[i].ModTime().Before(files[j].ModTime())
-}
-
-//-------------------------------------------------------------------------------------------------
-
-// Errors gets any errors encountered when checking the files.
-func (files Files) Errors() Errors {
-	ee := make(Errors, 0, len(files))
-	for _, f := range files {
-		if f.err != nil {
-			ee = append(ee, f.err)
-		}
-	}
-	return ee
-}
-
-//-------------------------------------------------------------------------------------------------
-
-// Errors holds a sequence of errors.
-type Errors []error
-
-// Error gets the error string, built from each error conjoined with a newline.
-func (ee Errors) Error() string {
-	buf := &strings.Builder{}
-	for i, e := range ee {
-		if i > 0 {
-			buf.WriteByte('\n')
-		}
-		buf.WriteString(e.Error())
-	}
-	return buf.String()
+func (file FileMetaInfo) OlderThan(other FileMetaInfo) bool {
+	return file.ModTime().Before(other.ModTime())
 }
 
 //-------------------------------------------------------------------------------------------------

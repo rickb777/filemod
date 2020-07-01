@@ -1,7 +1,6 @@
 package filemod
 
 import (
-	"errors"
 	. "github.com/onsi/gomega"
 	"os"
 	"testing"
@@ -12,6 +11,14 @@ func TestBlank(t *testing.T) {
 	g := NewGomegaWithT(t)
 	m := Stat("")
 	g.Expect(m.Exists()).NotTo(BeTrue())
+}
+
+func TestOf(t *testing.T) {
+	g := NewGomegaWithT(t)
+	m1 := Stat("a")
+	m2 := Stat("2")
+	ff := Of(m1, m2)
+	g.Expect(ff).To(HaveLen(2))
 }
 
 func TestStatMissing(t *testing.T) {
@@ -74,78 +81,7 @@ func TestStatEtc(t *testing.T) {
 	g.Expect(m.Err()).To(BeNil())
 }
 
-func TestHappy(t *testing.T) {
-	g := NewGomegaWithT(t)
-	now := time.Now().UTC()
-	fi := fileInfo{name: "foo", size: 123, modTime: now}
-	fs = osStub(map[string]fileInfo{"/a/b/c/foo": fi}) // global
-
-	// When...
-	m := New("/a/b/c/foo")
-
-	// Then...
-	g.Expect(len(m)).To(Equal(1))
-	g.Expect(m[0].Path()).To(Equal("/a/b/c/foo"))
-	g.Expect(m[0].ModTime()).To(Equal(now))
-	g.Expect(m[0].Exists()).To(BeTrue())
-	g.Expect(m[0].Err()).To(BeNil())
-}
-
-func TestPartition(t *testing.T) {
-	g := NewGomegaWithT(t)
-	// Given...
-	now := time.Now().UTC()
-	fa := fileInfo{name: "foo", size: 123, modTime: now}
-	fd := fileInfo{name: "d", size: 456, modTime: now, isDir: true}
-	fs = osStub(map[string]fileInfo{"/a/foo": fa, "/a/b/c/d": fd}) // global
-	m := New("/a/foo", "/a/b/c/d", "/a/x")
-	g.Expect(len(m)).To(Equal(3))
-
-	// When...
-	files, dirs, absent := m.Partition()
-
-	// Then...
-	g.Expect(len(files)).To(Equal(1))
-	g.Expect(len(dirs)).To(Equal(1))
-	g.Expect(len(files)).To(Equal(1))
-	g.Expect(len(absent)).To(Equal(1))
-	g.Expect(files[0].IsDir()).To(BeFalse())
-	g.Expect(files[0].Exists()).To(BeTrue())
-	g.Expect(dirs[0].IsDir()).To(BeTrue())
-	g.Expect(dirs[0].Exists()).To(BeTrue())
-	g.Expect(absent[0].Exists()).To(BeFalse())
-}
-
-func TestCompare(t *testing.T) {
-	g := NewGomegaWithT(t)
-	// Given...
-	now := time.Now().UTC()
-	a1 := fileInfo{name: "a1", size: 11, modTime: now.Add(-11)}
-	a2 := fileInfo{name: "a2", size: 22, modTime: now.Add(-12)}
-	b1 := fileInfo{name: "b1", size: 11, modTime: now.Add(-2)}
-	b2 := fileInfo{name: "b2", size: 22, modTime: now.Add(-1)}
-	fs = osStub(map[string]fileInfo{"/a1": a1, "/a2": a2, "/b1": b1, "/b2": b2}) // global
-	g1 := New("/a1", "/a2")
-	g2 := New("/b1", "/b2")
-	ab := New("/a1", "/b2")
-	x := New()
-
-	// When...
-	v1 := g1.Compare(g2)
-	v2 := g2.Compare(g1)
-	v3 := g2.Compare(ab)
-	v4a := g2.Compare(x)
-	v4b := x.Compare(g2)
-
-	// Then...
-	g.Expect(v1).To(Equal(AllAreOlder))
-	g.Expect(v2).To(Equal(AllAreYounger))
-	g.Expect(v3).To(Equal(Overlapping))
-	g.Expect(v4a).To(Equal(Undefined))
-	g.Expect(v4b).To(Equal(Undefined))
-}
-
-func TestYounger(t *testing.T) {
+func TestYoungerThan(t *testing.T) {
 	g := NewGomegaWithT(t)
 	// Given...
 	now := time.Now().UTC()
@@ -157,15 +93,15 @@ func TestYounger(t *testing.T) {
 	m1 := Stat("/a1")
 	m2 := Stat("/a2")
 
-	y1 := m1.Younger(m2)
-	y2 := m2.Younger(m1)
+	y1 := m1.Newer(m2)
+	y2 := m2.Newer(m1)
 
 	// Then...
 	g.Expect(y1.Name()).To(Equal("a1"))
 	g.Expect(y2.Name()).To(Equal("a1"))
 }
 
-func TestOlder(t *testing.T) {
+func TestOlderThan(t *testing.T) {
 	g := NewGomegaWithT(t)
 	// Given...
 	now := time.Now().UTC()
@@ -183,21 +119,6 @@ func TestOlder(t *testing.T) {
 	// Then...
 	g.Expect(y1.Name()).To(Equal("a2"))
 	g.Expect(y2.Name()).To(Equal("a2"))
-}
-
-func TestErrors(t *testing.T) {
-	g := NewGomegaWithT(t)
-	// Given...
-	a1 := fileInfo{err: errors.New("a1")}
-	a2 := fileInfo{err: errors.New("a2")}
-	fs = osStub(map[string]fileInfo{"/a1": a1, "/a2": a2}) // global
-	g1 := New("/a1", "/a2")
-
-	// When...
-	s := g1.Errors().Error()
-
-	// Then...
-	g.Expect(s).To(Equal("a1\na2"))
 }
 
 //-------------------------------------------------------------------------------------------------
