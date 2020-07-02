@@ -9,10 +9,10 @@ import (
 type FileMetaInfo struct {
 	path string
 	err  error
-	fi   os.FileInfo
+	fi   os.FileInfo // absent if file does not exist
 }
 
-// Tests whether the file exists,
+// Tests whether the file exists.
 func (file FileMetaInfo) Exists() bool {
 	return file.fi != nil && file.err == nil
 }
@@ -64,6 +64,8 @@ func (file FileMetaInfo) Sys() interface{} {
 	return file.fi.Sys()
 }
 
+// Err gets the error, if any, from Stat.
+// If there is an error, it will be of type *os.PathError.
 func (file FileMetaInfo) Err() error {
 	return file.err
 }
@@ -79,6 +81,24 @@ func Stat(path string) FileMetaInfo {
 
 	info, err := fs.Stat(path)
 
+	return newFileMetaInfo(path, err, info)
+}
+
+// Lstat tests a file path using the operating system.
+// If the file is a symbolic link, the returned FileInfo
+// describes the symbolic link. Lstat makes no attempt to follow the link.
+func Lstat(path string) FileMetaInfo {
+	Debug("lstat %q\n", path)
+	if path == "" {
+		return FileMetaInfo{path: path}
+	}
+
+	info, err := fs.Lstat(path)
+
+	return newFileMetaInfo(path, err, info)
+}
+
+func newFileMetaInfo(path string, err error, info os.FileInfo) FileMetaInfo {
 	if err != nil {
 		if os.IsNotExist(err) {
 			Debug("%q does not exist.\n", path)
@@ -94,6 +114,14 @@ func Stat(path string) FileMetaInfo {
 		fi:   info,
 	}
 }
+
+// Refresh queries the operating system for the status of the file again.
+// A new FileMetaInfo is returned that contains the current status of the file.
+func (file FileMetaInfo) Refresh() FileMetaInfo {
+	return Stat(file.path)
+}
+
+//-------------------------------------------------------------------------------------------------
 
 // Newer compares the modification timestamps and returns the
 // file that is newer.

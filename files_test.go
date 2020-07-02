@@ -11,7 +11,7 @@ func TestHappy(t *testing.T) {
 	g := NewGomegaWithT(t)
 	now := time.Now().UTC()
 	fi := fileInfo{name: "foo", size: 123, modTime: now}
-	fs = osStub(map[string]fileInfo{"/a/b/c/foo": fi}) // global
+	fs = &osStub{[]fileInfo{fi}} // global
 
 	// When...
 	m := New("/a/b/c/foo")
@@ -30,7 +30,7 @@ func TestPartition(t *testing.T) {
 	now := time.Now().UTC()
 	fa := fileInfo{name: "foo", size: 123, modTime: now}
 	fd := fileInfo{name: "d", size: 456, modTime: now, isDir: true}
-	fs = osStub(map[string]fileInfo{"/a/foo": fa, "/a/b/c/d": fd}) // global
+	fs = &osStub{[]fileInfo{fa, fd}} // global
 	m := New("/a/foo", "/a/b/c/d", "/a/x")
 	g.Expect(len(m)).To(Equal(3))
 
@@ -64,7 +64,7 @@ func TestSortedByModTime(t *testing.T) {
 	b2 := fileInfo{name: "b2", size: 22, modTime: tb2}
 	x1 := fileInfo{name: "x1"}
 	x2 := fileInfo{name: "x2"}
-	fs = osStub(map[string]fileInfo{"/a1": a1, "/a2": a2, "/b1": b1, "/b2": b2, "/x1": x1, "/x2": x2})
+	fs = &osStub{[]fileInfo{a1, a2, b1, b2, x1, x2}}
 	group := New("/a1", "/a2", "/b1", "/b2", "/x1", "/x2")
 
 	// When...
@@ -88,7 +88,7 @@ func TestSortedByPath(t *testing.T) {
 	b2 := fileInfo{name: "b2"}
 	x1 := fileInfo{name: "x1"}
 	x2 := fileInfo{name: "x2"}
-	fs = osStub(map[string]fileInfo{"/a1": a1, "/a2": a2, "/b1": b1, "/b2": b2, "/x1": x1, "/x2": x2})
+	fs = &osStub{[]fileInfo{a1, x1, b1, a2, b2, x2}}
 	group := New("/a1", "/x1", "/b1", "/a2", "/b2", "/x2")
 
 	// When...
@@ -111,7 +111,7 @@ func TestSortedBySize(t *testing.T) {
 	b1 := fileInfo{name: "b1", size: 44}
 	b2 := fileInfo{name: "b2", size: 22}
 	x1 := fileInfo{name: "x1"}
-	fs = osStub(map[string]fileInfo{"/a1": a1, "/a2": a2, "/b1": b1, "/b2": b2, "/x1": x1})
+	fs = &osStub{[]fileInfo{a1, x1, b1, a2, b2}}
 	group := New("/a1", "/x1", "/b1", "/a2", "/b2")
 
 	// When...
@@ -134,9 +134,9 @@ func TestCompare(t *testing.T) {
 	a2 := fileInfo{name: "a2", size: 22, modTime: now.Add(-2 * time.Minute)}
 	b1 := fileInfo{name: "b1", size: 11, modTime: now.Add(-2)}
 	b2 := fileInfo{name: "b2", size: 22, modTime: now.Add(-1)}
-	x1 := fileInfo{name: "x1"}
-	x2 := fileInfo{name: "x2"}
-	fs = osStub(map[string]fileInfo{"/a1": a1, "/a2": a2, "/b1": b1, "/b2": b2, "/x1": x1, "/x2": x2})
+	//x1 := fileInfo{name: "x1"}
+	//x2 := fileInfo{name: "x2"}
+	fs = &osStub{[]fileInfo{a1, a2, b1, b2, a1, b2}}
 	a1a2 := New("/a1", "/a2")
 	b1b2 := New("/b1", "/b2")
 	a1b2 := New("/a1", "/b2")
@@ -160,7 +160,7 @@ func TestErrors(t *testing.T) {
 	// Given...
 	a1 := fileInfo{err: errors.New("a1")}
 	a2 := fileInfo{err: errors.New("a2")}
-	fs = osStub(map[string]fileInfo{"/a1": a1, "/a2": a2}) // global
+	fs = &osStub{[]fileInfo{a1, a2}} // global
 	g1 := New("/a1", "/a2")
 
 	// When...

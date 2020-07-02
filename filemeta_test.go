@@ -9,8 +9,12 @@ import (
 
 func TestBlank(t *testing.T) {
 	g := NewGomegaWithT(t)
-	m := Stat("")
-	g.Expect(m.Exists()).NotTo(BeTrue())
+
+	m1 := Stat("")
+	g.Expect(m1.Exists()).NotTo(BeTrue())
+
+	m2 := Lstat("")
+	g.Expect(m2.Exists()).NotTo(BeTrue())
 }
 
 func TestOf(t *testing.T) {
@@ -47,18 +51,52 @@ func TestStatHosts(t *testing.T) {
 	fs = osFacade{} // the real deal
 
 	// When...
-	m := Stat("/etc/hosts")
+	m1 := Stat("/etc/hosts")
 
 	// Then...
-	g.Expect(m.Path()).To(Equal("/etc/hosts"))
-	g.Expect(m.Name()).To(Equal("hosts"))
-	g.Expect(m.Exists()).To(BeTrue())
-	g.Expect(m.IsDir()).To(BeFalse())
-	g.Expect(m.Mode()).NotTo(BeEquivalentTo(0))
-	g.Expect(m.Size()).To(BeNumerically(">", 0))
-	g.Expect(m.ModTime().IsZero()).To(BeFalse())
-	g.Expect(m.Sys()).NotTo(BeNil())
-	g.Expect(m.Err()).To(BeNil())
+	g.Expect(m1.Path()).To(Equal("/etc/hosts"))
+	g.Expect(m1.Name()).To(Equal("hosts"))
+	g.Expect(m1.Exists()).To(BeTrue())
+	g.Expect(m1.IsDir()).To(BeFalse())
+	g.Expect(m1.Mode()).NotTo(BeEquivalentTo(0))
+	g.Expect(m1.Size()).To(BeNumerically(">", 0))
+	g.Expect(m1.ModTime().IsZero()).To(BeFalse())
+	g.Expect(m1.Sys()).NotTo(BeNil())
+	g.Expect(m1.Err()).To(BeNil())
+
+	// When...
+	m2 := m1.Refresh()
+
+	// Then...
+	g.Expect(m2.Path()).To(Equal("/etc/hosts"))
+	g.Expect(m2.Name()).To(Equal("hosts"))
+	g.Expect(m2.Exists()).To(BeTrue())
+	g.Expect(m2.IsDir()).To(BeFalse())
+	g.Expect(m2.Mode()).NotTo(BeEquivalentTo(0))
+	g.Expect(m2.Size()).To(BeNumerically(">", 0))
+	g.Expect(m2.ModTime().IsZero()).To(BeFalse())
+	g.Expect(m2.Sys()).NotTo(BeNil())
+	g.Expect(m2.Err()).To(BeNil())
+}
+
+func TestLstatHosts(t *testing.T) {
+	g := NewGomegaWithT(t)
+	// Given...
+	fs = osFacade{} // the real deal
+
+	// When...
+	m1 := Lstat("/etc/hosts")
+
+	// Then...
+	g.Expect(m1.Path()).To(Equal("/etc/hosts"))
+	g.Expect(m1.Name()).To(Equal("hosts"))
+	g.Expect(m1.Exists()).To(BeTrue())
+	g.Expect(m1.IsDir()).To(BeFalse())
+	g.Expect(m1.Mode()).NotTo(BeEquivalentTo(0))
+	g.Expect(m1.Size()).To(BeNumerically(">", 0))
+	g.Expect(m1.ModTime().IsZero()).To(BeFalse())
+	g.Expect(m1.Sys()).NotTo(BeNil())
+	g.Expect(m1.Err()).To(BeNil())
 }
 
 func TestStatEtc(t *testing.T) {
@@ -81,13 +119,31 @@ func TestStatEtc(t *testing.T) {
 	g.Expect(m.Err()).To(BeNil())
 }
 
+func TestRefresh(t *testing.T) {
+	g := NewGomegaWithT(t)
+	// Given...
+	now := time.Now().UTC()
+	t1 := fileInfo{name: "t1", size: 11, modTime: now.Add(-2)}
+	t2 := fileInfo{name: "t2", size: 22, modTime: now.Add(-1)}
+	fs = &osStub{[]fileInfo{t1, t2}} // global
+
+	// When...
+	m1 := Stat("/t")
+	m2 := m1.Refresh()
+
+	// Then...
+	g.Expect(m1.Path()).To(Equal("/t"))
+	g.Expect(m2.Path()).To(Equal("/t"))
+	g.Expect(m1.ModTime().Before(m2.ModTime())).To(BeTrue())
+}
+
 func TestYoungerThan(t *testing.T) {
 	g := NewGomegaWithT(t)
 	// Given...
 	now := time.Now().UTC()
 	a1 := fileInfo{name: "a1", size: 11, modTime: now.Add(-11)}
 	a2 := fileInfo{name: "a2", size: 22, modTime: now.Add(-12)}
-	fs = osStub(map[string]fileInfo{"/a1": a1, "/a2": a2}) // global
+	fs = &osStub{[]fileInfo{a1, a2}} // global
 
 	// When...
 	m1 := Stat("/a1")
@@ -107,7 +163,7 @@ func TestOlderThan(t *testing.T) {
 	now := time.Now().UTC()
 	a1 := fileInfo{name: "a1", size: 11, modTime: now.Add(-11)}
 	a2 := fileInfo{name: "a2", size: 22, modTime: now.Add(-12)}
-	fs = osStub(map[string]fileInfo{"/a1": a1, "/a2": a2}) // global
+	fs = &osStub{[]fileInfo{a1, a2}} // global
 
 	// When...
 	m1 := Stat("/a1")
@@ -160,14 +216,26 @@ var _ os.FileInfo = fileInfo{}
 
 //-------------------------------------------------------------------------------------------------
 
-type osStub map[string]fileInfo
+// stub works as a stack of file infos from which items are popped on each Stat/Lstat call
+type osStub struct {
+	fi []fileInfo
+}
 
-func (stub osStub) Stat(name string) (os.FileInfo, error) {
-	v, exists := stub[name]
-	if !exists {
+func (stub *osStub) Stat(_ string) (os.FileInfo, error) {
+	return stub.fakeStat()
+}
+
+func (stub *osStub) Lstat(_ string) (os.FileInfo, error) {
+	return stub.fakeStat()
+}
+
+func (stub *osStub) fakeStat() (os.FileInfo, error) {
+	if len(stub.fi) == 0 {
 		return nil, os.ErrNotExist
 	}
+	v := stub.fi[0]
+	stub.fi = stub.fi[1:]
 	return v, v.err
 }
 
-var _ statter = osStub{}
+var _ statter = &osStub{}
