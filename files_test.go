@@ -40,13 +40,89 @@ func TestPartition(t *testing.T) {
 	// Then...
 	g.Expect(len(files)).To(Equal(1))
 	g.Expect(len(dirs)).To(Equal(1))
-	g.Expect(len(files)).To(Equal(1))
 	g.Expect(len(absent)).To(Equal(1))
 	g.Expect(files[0].IsDir()).To(BeFalse())
 	g.Expect(files[0].Exists()).To(BeTrue())
 	g.Expect(dirs[0].IsDir()).To(BeTrue())
 	g.Expect(dirs[0].Exists()).To(BeTrue())
 	g.Expect(absent[0].Exists()).To(BeFalse())
+}
+
+func TestDirectoriesOnly(t *testing.T) {
+	g := NewGomegaWithT(t)
+	// Given...
+	now := time.Now().UTC()
+	fa := fileInfo{name: "foo", size: 123, modTime: now}
+	fd := fileInfo{name: "d", size: 456, modTime: now, isDir: true}
+	fs = &osStub{[]fileInfo{fa, fd}} // global
+	m := New("/a/foo", "/a/b/c/d", "/a/x")
+	g.Expect(len(m)).To(Equal(3))
+
+	// When...
+	dirs := m.DirectoriesOnly()
+
+	// Then...
+	g.Expect(len(dirs)).To(Equal(1))
+	g.Expect(dirs[0].IsDir()).To(BeTrue())
+	g.Expect(dirs[0].Exists()).To(BeTrue())
+}
+
+func TestFilesOnly(t *testing.T) {
+	g := NewGomegaWithT(t)
+	// Given...
+	now := time.Now().UTC()
+	fa := fileInfo{name: "foo", size: 123, modTime: now}
+	fd := fileInfo{name: "d", size: 456, modTime: now, isDir: true}
+	fs = &osStub{[]fileInfo{fa, fd}} // global
+	m := New("/a/foo", "/a/b/c/d", "/a/x")
+	g.Expect(len(m)).To(Equal(3))
+
+	// When...
+	files := m.FilesOnly()
+
+	// Then...
+	g.Expect(len(files)).To(Equal(1))
+	g.Expect(files[0].IsDir()).To(BeFalse())
+	g.Expect(files[0].Exists()).To(BeTrue())
+}
+
+func TestAbsentOnly(t *testing.T) {
+	g := NewGomegaWithT(t)
+	// Given...
+	now := time.Now().UTC()
+	fa := fileInfo{name: "foo", size: 123, modTime: now}
+	fd := fileInfo{name: "d", size: 456, modTime: now, isDir: true}
+	fs = &osStub{[]fileInfo{fa, fd}} // global
+	m := New("/a/foo", "/a/b/c/d", "/a/x")
+	g.Expect(len(m)).To(Equal(3))
+
+	// When...
+	absent := m.AbsentOnly()
+
+	// Then...
+	g.Expect(len(absent)).To(Equal(1))
+	g.Expect(absent[0].Exists()).To(BeFalse())
+}
+
+func TestPresentOnly(t *testing.T) {
+	g := NewGomegaWithT(t)
+	// Given...
+	now := time.Now().UTC()
+	fa := fileInfo{name: "foo", size: 123, modTime: now}
+	fd := fileInfo{name: "d", size: 456, modTime: now, isDir: true}
+	fs = &osStub{[]fileInfo{fa, fd}} // global
+	m := New("/a/foo", "/a/b/c/d", "/a/x")
+	g.Expect(len(m)).To(Equal(3))
+
+	// When...
+	present := m.PresentOnly()
+
+	// Then...
+	g.Expect(len(present)).To(Equal(2))
+	g.Expect(present[0].IsDir()).To(BeFalse())
+	g.Expect(present[0].Exists()).To(BeTrue())
+	g.Expect(present[1].IsDir()).To(BeTrue())
+	g.Expect(present[1].Exists()).To(BeTrue())
 }
 
 func TestSortedByModTime(t *testing.T) {

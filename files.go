@@ -5,7 +5,8 @@ import (
 	"strings"
 )
 
-// Files holdsdata on a group of files.
+// Files holds data on a group of files.
+// Use the builtin 'append' if required; also use slicing as required.
 type Files []FileMetaInfo
 
 // New builds file information for one or more files. If filesystem errors
@@ -114,6 +115,56 @@ func (files Files) Partition() (allFiles, allDirs, absent Files) {
 	}
 
 	return allFiles, allDirs, absent
+}
+
+// Filter returns only those items for which a predicate p returns true.
+func (files Files) Filter(p func(info FileMetaInfo) bool) Files {
+	// to avoid unnecessary memory allocation, the first pass counts the items
+	n := 0
+	for _, f := range files {
+		if p(f) {
+			n++
+		}
+	}
+
+	result := make(Files, 0, n)
+
+	// the second pass builds the results
+	for _, f := range files {
+		if p(f) {
+			result = append(result, f)
+		}
+	}
+
+	return result
+}
+
+// FilesOnly returns only files that exist (i.e. not directories).
+func (files Files) FilesOnly() Files {
+	return files.Filter(func(f FileMetaInfo) bool {
+		return f.Exists() && !f.IsDir()
+	})
+}
+
+// DirectoriesOnly returns only directories that exist.
+func (files Files) DirectoriesOnly() Files {
+	return files.Filter(func(f FileMetaInfo) bool {
+		return f.Exists() && f.IsDir()
+	})
+}
+
+// PresentOnly returns only those files/directories that exist.
+func (files Files) PresentOnly() Files {
+	return files.Filter(func(f FileMetaInfo) bool {
+		return f.Exists()
+	})
+}
+
+// AbsentOnly returns only those files/directories that don't exist.
+func (files Files) AbsentOnly() Files {
+	return files.Filter(func(f FileMetaInfo) bool {
+		return !f.Exists()
+	})
 }
 
 //-------------------------------------------------------------------------------------------------
