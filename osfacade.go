@@ -2,8 +2,8 @@ package filemod
 
 import "os"
 
-// OS is a seam for testing
-type OS interface {
+// statter is a seam for testing
+type statter interface {
 	Stat(name string) (os.FileInfo, error)
 }
 
@@ -13,4 +13,4 @@ func (o osFacade) Stat(name string) (os.FileInfo, error) {
 	return os.Stat(name)
 }
 
-var fs OS = osFacade{}
+var fs statter = osFacade{}

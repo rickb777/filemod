@@ -170,4 +170,4 @@ func (stub osStub) Stat(name string) (os.FileInfo, error) {
 	return v, v.err
 }
 
-var _ OS = osStub{}
+var _ statter = osStub{}
