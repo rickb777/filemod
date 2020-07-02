@@ -129,6 +129,7 @@ func TestCompare(t *testing.T) {
 	g := NewGomegaWithT(t)
 	// Given...
 	now := time.Now().UTC()
+	empty := Of()
 	a1 := fileInfo{name: "a1", size: 11, modTime: now.Add(-1 * time.Minute)}
 	a2 := fileInfo{name: "a2", size: 22, modTime: now.Add(-2 * time.Minute)}
 	b1 := fileInfo{name: "b1", size: 11, modTime: now.Add(-2)}
@@ -139,11 +140,6 @@ func TestCompare(t *testing.T) {
 	a1a2 := New("/a1", "/a2")
 	b1b2 := New("/b1", "/b2")
 	a1b2 := New("/a1", "/b2")
-	//x := New()
-
-	// When...
-	//v4a := b1b2.Compare(x)
-	//v4b := x.Compare(b1b2)
 
 	// Then...
 	g.Expect(a1a2.AllAreOlderThan(b1b2)).To(BeTrue())
@@ -155,8 +151,8 @@ func TestCompare(t *testing.T) {
 	g.Expect(b1b2.OverlapsWith(a1b2)).To(BeTrue())
 	g.Expect(a1b2.OverlapsWith(b1b2)).To(BeTrue())
 
-	//g.Expect(v4a).To(Equal(undefined))
-	//g.Expect(v4b).To(Equal(undefined))
+	g.Expect(a1a2.compare(empty)).To(Equal(undefined))
+	g.Expect(empty.compare(b1b2)).To(Equal(undefined))
 }
 
 func TestErrors(t *testing.T) {
