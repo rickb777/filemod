@@ -12,10 +12,12 @@ type FileMetaInfo struct {
 	fi   os.FileInfo
 }
 
+// Tests whether the file exists,
 func (file FileMetaInfo) Exists() bool {
 	return file.fi != nil && file.err == nil
 }
 
+// Gets the file path.
 func (file FileMetaInfo) Path() string {
 	return file.path
 }
@@ -68,6 +70,7 @@ func (file FileMetaInfo) Err() error {
 
 //-------------------------------------------------------------------------------------------------
 
+// Stat tests a file path using the operating system.
 func Stat(path string) FileMetaInfo {
 	Debug("stat %q\n", path)
 	if path == "" {
@@ -92,6 +95,8 @@ func Stat(path string) FileMetaInfo {
 	}
 }
 
+// Newer compares the modification timestamps and returns the
+// file that is newer.
 func (file FileMetaInfo) Newer(other FileMetaInfo) FileMetaInfo {
 	if file.NewerThan(other) {
 		return file
@@ -99,6 +104,8 @@ func (file FileMetaInfo) Newer(other FileMetaInfo) FileMetaInfo {
 	return other
 }
 
+// Older compares the modification timestamps and returns the
+// file that is older.
 func (file FileMetaInfo) Older(other FileMetaInfo) FileMetaInfo {
 	if file.OlderThan(other) {
 		return file
@@ -106,10 +113,14 @@ func (file FileMetaInfo) Older(other FileMetaInfo) FileMetaInfo {
 	return other
 }
 
+// NewerThan compares the modification timestamps and returns true
+// if this file is newer than the other.
 func (file FileMetaInfo) NewerThan(other FileMetaInfo) bool {
 	return file.ModTime().After(other.ModTime())
 }
 
+// OlderThan compares the modification timestamps and returns true
+// if this file is older than the other.
 func (file FileMetaInfo) OlderThan(other FileMetaInfo) bool {
 	return file.ModTime().Before(other.ModTime())
 }

@@ -61,21 +61,28 @@ func (files Files) compare(other Files) comparison {
 	return overlapping
 }
 
+// AllAreOlderThan compares the file modification timestamps of two lists of files,
+// returning true if all of 'files' are older than all of 'other'.
 func (files Files) AllAreOlderThan(other Files) bool {
 	return files.compare(other) == allAreOlder
 }
 
+// OverlapsWith compares the file modification timestamps
+// of two lists of files, returning true if the range of modification times of
+// 'files' overlaps with the range of modification times of the 'other' list.
 func (files Files) OverlapsWith(other Files) bool {
 	return files.compare(other) == overlapping
 }
 
+// AllAreNewerThan compares the file modification timestamps of two lists of files,
+// returning true if all of 'files' are newer than all of 'other'.
 func (files Files) AllAreNewerThan(other Files) bool {
 	return files.compare(other) == allAreNewer
 }
 
 //-------------------------------------------------------------------------------------------------
 
-// Partition separates files and riectories that exist from those that don't.
+// Partition separates files and directories that exist from those that don't.
 func (files Files) Partition() (allFiles, allDirs, absent Files) {
 	// to avoid unnecessary memory allocation, the first pass counts the items
 	nf, nd, na := 0, 0, 0
@@ -132,7 +139,7 @@ func (files byModTime) Less(i, j int) bool {
 
 //-------------------------------------------------------------------------------------------------
 
-// SortedByPath rearranges the files into path order
+// SortedByPath rearranges the files into path order, similar to comparing pairs of strings.
 func (files Files) SortedByPath() {
 	sort.Stable(byPath(files))
 }
@@ -187,7 +194,7 @@ func (files Files) Errors() Errors {
 
 //-------------------------------------------------------------------------------------------------
 
-// Errors holds a sequence of errors.
+// Errors holds a slice of errors and is itself an error.
 type Errors []error
 
 // Error gets the error string, built from each error conjoined with a newline.
