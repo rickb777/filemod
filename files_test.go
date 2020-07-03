@@ -201,6 +201,39 @@ func TestSortedBySize(t *testing.T) {
 	g.Expect(group[4].Name()).To(Equal("b1"))
 }
 
+func TestFirstAndLast(t *testing.T) {
+	g := NewGomegaWithT(t)
+	// Given...
+	a := fileInfo{name: "a", size: 11}
+	b := fileInfo{name: "b", size: 44}
+	c := fileInfo{name: "c", size: 33}
+	d := fileInfo{name: "d", size: 22}
+	fs = &osStub{[]fileInfo{a, b, c, d}}
+	group := New("/a", "/b", "/c", "/d")
+
+	// When...
+	first := group.First()
+	last := group.Last()
+
+	// Then...
+	g.Expect(first.Name()).To(Equal("a"))
+	g.Expect(last.Name()).To(Equal("d"))
+}
+
+func TestEmptyFirstAndLast(t *testing.T) {
+	g := NewGomegaWithT(t)
+	// Given...
+	group := Of()
+
+	// When...
+	first := group.First()
+	last := group.Last()
+
+	// Then...
+	g.Expect(first).To(BeNil())
+	g.Expect(last).To(BeNil())
+}
+
 func TestCompare(t *testing.T) {
 	g := NewGomegaWithT(t)
 	// Given...

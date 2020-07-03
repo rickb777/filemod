@@ -167,11 +167,31 @@ func (files Files) AbsentOnly() Files {
 	})
 }
 
+// First returns the first file, equivalent to files[0] with a check
+// for an empty slice.
+func (files Files) First() *FileMetaInfo {
+	if len(files) == 0 {
+		return nil
+	}
+	return &files[0]
+}
+
+// Last returns the last file, equivalent to files[n-1] with a check
+// for an empty slice.
+func (files Files) Last() *FileMetaInfo {
+	if len(files) == 0 {
+		return nil
+	}
+	return &files[len(files)-1]
+}
+
 //-------------------------------------------------------------------------------------------------
 
 // SortedByModTime rearranges the files into modification-time order with the oldest first.
-func (files Files) SortedByModTime() {
+// It returns the modified list.
+func (files Files) SortedByModTime() Files {
 	sort.Stable(byModTime(files))
+	return files
 }
 
 type byModTime Files
@@ -191,8 +211,10 @@ func (files byModTime) Less(i, j int) bool {
 //-------------------------------------------------------------------------------------------------
 
 // SortedByPath rearranges the files into path order, similar to comparing pairs of strings.
-func (files Files) SortedByPath() {
+// It returns the modified list.
+func (files Files) SortedByPath() Files {
 	sort.Stable(byPath(files))
+	return files
 }
 
 type byPath Files
@@ -211,9 +233,10 @@ func (files byPath) Less(i, j int) bool {
 
 //-------------------------------------------------------------------------------------------------
 
-// SortedBySize rearranges the files into size order
-func (files Files) SortedBySize() {
+// SortedBySize rearranges the files into size order. It returns the modified list.
+func (files Files) SortedBySize() Files {
 	sort.Stable(bySize(files))
+	return files
 }
 
 type bySize Files
